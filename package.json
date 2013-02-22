@@ -1,9 +1,13 @@
 {
-  "name": "random-access-file",
+  "name": "part-file",
   "version": "0.0.1",
-  "description": "a simple way of getting random access for a file",
+  "description": "Read and write parts to a partfile",
+  "repository": "git://github.com/mafintosh/part-file",
   "keywords": [
-    "file",
-    "random access"
-  ]
+    "parts",
+    "fs"
+  ],
+  "dependencies": {
+    "thunky":"~0.1.0"
+  }
 }

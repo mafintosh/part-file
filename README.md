@@ -1,28 +1,32 @@
-# random-access-file
+# part-file
 
-Random Access File allows you to read or write to a file using random offsets and lengths
+Read and write parts to a file with random access support
 
-	npm install random-access-file
+	npm install part-file
 
-# Usage is easy
+# Usage
 
 ``` js
-var raf = require('random-access-file');
+var partFile = require('part-file');
 
-var file = raf('my-file.txt', {
-	size: 1024 // if a size is given the file will be truncted to fit this size
+var file = part('my-file.txt', 1024, [ // 1024 is the part size
+	'sha1 hex of first part',
+	'sha1 hex of second part'
+]);
+
+file.on('readable', function(partNumber) {
+	// when a part becomes readable this event will be called
 });
 
-file.write(10, new Buffer('hello'), function(err) {
-	// write a buffer to offset 10
-	file.read(10, 5, function(err, buffer) {
-		console.log(buffer); // read 5 bytes from offset 10
-	});
+file.write(partNumber, buffer, function(err) {
+	// if the hash doesnt match there will be an error
 });
+
+file.read(partNumber, function(err, buffer) {
+	// if part hasnt been written there will be an error
+});
+
 ```
-
-The file will use an open file descriptor.
-When you are done with the file you should call `file.close()`.
 
 ## License
 

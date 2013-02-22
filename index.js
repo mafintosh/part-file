@@ -1,89 +1,97 @@
 var fs = require('fs');
+var crypto = require('crypto');
+var thunky = require('thunky');
+var events = require('events');
 
-var RandomAccessFile = function(path, options) {
-	if (!(this instanceof RandomAccessFile)) return new RandomAccessFile(path, options);
-
-	options = options || {};
-
-	this.partial = options.partial;
-	this.path = path;
-	this.size = options.size;
-
-	var open = function(callback) {
-		var stack = [callback];
-
-		action = function(callback) {
-			stack.push(callback);
-		};
-
-		var onfd = function(err, fd) {
-			action = err ? open : function(callback) {
-				callback(err, fd);
-			};
-
-			while (stack.length) stack.shift()(err, fd);
-		};
-
-		fs.open(path, 'a+', function(err, fd) {
-			if (err || typeof options.size !== 'number') return onfd(err, fd);
-
-			fs.truncate(fd, options.size, function(err) {
-				if (!err) return onfd(null, fd);
-
-				fs.close(fd, function() {
-					onfd(err);
-				});
-			});
-		});
-	};
-
-	var action = open;
-
-	this.open = function(callback) {
-		action(callback);
-	};
+var noop = function() {};
+var sha1 = function(data) {
+	return crypto.createHash('sha1').update(data).digest('hex');
 };
 
-RandomAccessFile.prototype.stat = function(callback) {
-	this.open(function(err, fd) {
-		if (err) return callback(err);
-		fs.fstat(fd, callback);
+var PartFile = function(filename, partSize, parts) {
+	if (!(this instanceof PartFile)) return new PartFile(filename, partSize, parts);
+
+	events.EventEmitter.call(this);
+
+	this.filename = filename;
+	this.parts = parts;
+	this.partSize = partSize;
+	this.verified = [];
+	this.verifiedParts = 0;
+
+	this.open = thunky(function(callback) {
+		fs.open(filename, 'a+', callback);
 	});
 };
 
-RandomAccessFile.prototype.write = function(offset, data, callback) {
-	if (this.size && offset < 0) offset += this.size;
-	if (!Buffer.isBuffer(data)) data = new Buffer(data);
+PartFile.prototype.__proto__ = events.EventEmitter.prototype;
 
-	this.open(function(err, fd) {
+PartFile.prototype.readable = function(index) {
+	return !!this.verified[index];
+};
+
+PartFile.prototype.complete = function() {
+	return this.verifiedParts === this.parts.length;
+};
+
+PartFile.prototype.verify = function(index, callback) {
+	if (!callback) callback = noop;
+	var self = this;
+	if (this.verified[index]) return callback(null, true);
+	this._read(index, function(err, buf) {
 		if (err) return callback(err);
-		console.log(data.toString());
-		fs.write(fd, data, 0, data.length, offset, callback);
+		if (sha1(buf) !== self.parts[index]) return callback(null, false);
+		self._verified(index);
+		callback(null, true);
 	});
 };
 
-RandomAccessFile.prototype.read = function(offset, length, callback) {
-	if (this.size && offset < 0) offset += this.size;
+PartFile.prototype.read = function(index, callback) {
+	if (!this.verified[index]) return callback(new Error('part is not written'));
+	this._read(index, callback);
+};
 
-	var buffer = new Buffer(length);
-	var partial = this.partial;
+PartFile.prototype.write = function(index, buf, callback) {
+	if (typeof buf === 'string') buf = new Buffer(buf);
+	if (!callback) callback = noop;
 
+	var self = this;
 	this.open(function(err, fd) {
-		if (err) return callback(err);
-		fs.read(fd, buffer, 0, length, offset, function(err, read) {
-			if (err) return callback(err);
-			if (partial && read) return callback(null, buffer.slice(0, read));
-			if (read < buffer.length) return callback();
-			callback(null, buffer);
+		if (sha1(buf) !== self.parts[index]) return callback(new Error('part is invalid'));
+		fs.write(fd, buf, 0, buf.length, index * self.partSize, function(err) {
+			if (!err) self._verified(index);
+			callback(err);
 		});
 	});
 };
 
-RandomAccessFile.prototype.close = function(callback) {
+PartFile.prototype.close = function(callback) {
+	if (!callback) callback = noop;
 	this.open(function(err, fd) {
 		if (err) return callback(err);
 		fs.close(fd, callback);
 	});
 };
 
-module.exports = RandomAccessFile;
+PartFile.prototype._read = function(index, callback) {
+	var self = this;
+	var partSize = this.partSize;
+	this.open(function(err, fd) {
+		if (err) return callback(err);
+		fs.read(fd, new Buffer(partSize), 0, partSize, index * partSize, function(err, bytesRead, buf) {
+			if (err) return callback(err);
+			if (!bytesRead) return callback(new Error('could not read any bytes'));
+			callback(null, buf.slice(0, bytesRead));
+		});
+	});
+};
+
+PartFile.prototype._verified = function(index) {
+	if (this.verified[index]) return;
+	this.verified[index] = true;
+	this.verifiedParts++;
+	this.emit('readable', index);
+	if (this.complete()) this.emit('complete');
+};
+
+module.exports = PartFile;

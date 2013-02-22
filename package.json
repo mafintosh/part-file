@@ -1,0 +1,9 @@
+{
+  "name": "random-access-file",
+  "version": "0.0.1",
+  "description": "a simple way of getting random access for a file",
+  "keywords": [
+    "file",
+    "random access"
+  ]
+}

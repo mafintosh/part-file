@@ -4,7 +4,7 @@ Read and write parts to a file with random access support
 
 	npm install part-file
 
-# Usage
+# usage
 
 ``` js
 var partFile = require('part-file');
@@ -25,9 +25,4 @@ file.write(partNumber, buffer, function(err) {
 file.read(partNumber, function(err, buffer) {
 	// if part hasnt been written there will be an error
 });
-
 ```
-
-## License
-
-MIT

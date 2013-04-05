@@ -9,7 +9,7 @@ Read and write parts to a file with random access support
 ``` js
 var partFile = require('part-file');
 
-var file = part('my-file.txt', 1024, [ // 1024 is the part size
+var file = partFile('my-file.txt', 1024, [ // 1024 is the part size
 	'sha1 hex of first part',
 	'sha1 hex of second part'
 ]);

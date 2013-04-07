@@ -20,7 +20,9 @@ var PartFile = function(filename, partSize, parts) {
 	this.verifiedParts = 0;
 
 	this.open = thunky(function(callback) {
-		fs.open(filename, 'a+', callback);
+		fs.exists(filename, function(exists) {
+			fs.open(filename, exists ? 'r+' : 'w+', callback);
+		});
 	});
 };
 
@@ -57,6 +59,7 @@ PartFile.prototype.write = function(index, buf, callback) {
 
 	var self = this;
 	this.open(function(err, fd) {
+		if (err) return callback(err);
 		if (sha1(buf) !== self.parts[index]) return callback(new Error('part is invalid'));
 		fs.write(fd, buf, 0, buf.length, index * self.partSize, function(err) {
 			if (!err) self._verified(index);

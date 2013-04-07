@@ -1,6 +1,6 @@
 {
   "name": "part-file",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Read and write parts to a partfile",
   "repository": "git://github.com/mafintosh/part-file",
   "keywords": [
